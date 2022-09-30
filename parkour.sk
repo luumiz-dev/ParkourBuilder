@@ -1,0 +1,546 @@
+#
+# LuuMiz's Parkour Skript
+#
+# Plugins Required: Skript, SkBee, skript-yaml
+#
+# COMMAND USAGE
+#   /aparkour create courseName : creates a Parkour Course to set a bounding box for.
+#   /aparkour pos1 courseName : sets corner 1
+#   /aparkour pos2 courseName : set corner 2
+#   /aparkour start courseName : sets block where timer starts for player, tp'ed players will be facing the direction you are when its set
+#   /aparkour end courseName : sets end block
+#   /aparkour colorname courseName newCourseName : use this to create a color coded name that appears in /parkour
+#   /aparkour reset : clears ALL parkour data. use with caution.
+#
+# COURSE NAMING
+#   course names can only be one word long for now
+# 
+# RESET BLOCK
+#   walking on barrier blocks inside of a parkour region will send you back to the current region's start block
+#
+# QUIT LOCATION
+#   this value needs to be set with /aparkour quitlocation before starting to create and parkour courses
+#   players will be sent to this location after completing or quitting a course
+#   recommended to set to your 'Parkour Hub' or your server's spawn
+# 
+# OVERLAPPING PARKOUR REGIONS 
+#   there is no code to prevent you from creating regions that overlap 
+#   do NOT set start or end pressure plates on a block that is in 2 regions
+# 
+# IRON AND GOLD PRESSURE PLATES
+#   only use one of each of these inside each parkour course region (or make 100% certain others are not reachable by players)
+#   they trigger start and end of courses
+# 
+# BREAKING BLOCKS 
+#   all players can break blocks in regions (including start and end pessure plates)
+#   use a plugin like grief prevention or world guard in combination with this skript
+#   another solution would be to force player's into adventure mode while in Parkour
+# 
+# LOGGING
+#   all course data of pos1, pos2, start, end, and world is saved in plugins/Skript/ParkourData/data.yml
+#   in addition, it also logs every player's best time on each course
+#   changing data in this file WILL NOT effect anything ingame. it is only there for your viewing convience 
+#
+
+options:
+    # GENERAL USAGE OPTIONS
+    prefix: [&6&lP&e&la&6&lr&e&lk&6&lo&e&lu&6&lr&f]
+    player_command: /parkour
+    admin_command: /aparkour
+
+    # MESSAGES SENT TO PLAYERS
+    player_teleports_to_course: Teleporting to Parkour Course...
+    player_starts_course: Starting Timer!
+    player_finishes_course: Finished Course!
+    player_leaves_course: Quitting Parkour...
+    player_command_warning_while_doing_course: You cannot use commands while in Parkour. Please use /parkour and click on 'Quit'
+
+on load:
+    load yml "plugins/Skript/ParkourData/data.yml" as "plugins/Skript/ParkourData/data.yml"
+
+on tab complete of "{@admin_command}":
+    set tab completions for position 1 to "create", "pos1", "pos2", "start", "help", "end", "delete", "colorname", and "quitlocation"
+    if {parkour.ListOfNames::*} is set:
+        set tab completions for position 2 to {parkour.ListOfNames::*}
+
+command {@admin_command} <text> [<text>] [<text>]:
+    permission:parkour.admin
+    trigger:
+        if arg-1 is "reset":
+            loop {parkour.ListOfNames::*}:
+
+                loop {parkour.ListOfAllPlayerUUIDs::*}:
+                    # send "besttime: %{parkour.playerhasfinished.besttime.%{parkour.ListOfNames::%loop-index-1%}%.%loop-value-2%}%" to player
+                    clear {parkour.playerhasfinished.besttime.%{parkour.ListOfNames::%loop-index-1%}%.%loop-value-2%}
+                    # send "playerhasfinsihed: %{parkour.playerhasfinished.%{parkour.ListOfNames::%loop-index-1%}%.%loop-value-2%}%" to player
+                    clear {parkour.playerhasfinished.%{parkour.ListOfNames::%loop-index-1%}%.%loop-value-2%}
+
+                # send "pos1: %{parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+                # send "pos2: %{parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+                # send "start: %{parkour.%{parkour.ListOfNames::%loop-index%}%.start}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.start}
+                # send "end: %{parkour.%{parkour.ListOfNames::%loop-index%}%.end}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.end}
+                # send "isCreated: %{parkour.%{parkour.ListOfNames::%loop-index%}%.isCreated}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.isCreated}
+                # send "name: %{parkour.%{parkour.ListOfNames::%loop-index%}%.name}%" to player
+                clear {parkour.%{parkour.ListOfNames::%loop-index%}%.name}
+
+                delete yaml value "courses.%{parkour.ListOfNames::%loop-index%}%" from "plugins/Skript/ParkourData/data.yml"
+
+            loop {parkour.ListOfAllPlayerUUIDs::*}:
+                # send "intpmenu: %{parkour.inTpMenu.%loop-value%}%" to player
+                clear {parkour.inTpMenu.%loop-value%}
+
+                # send "playerisrunning: %{parkour.playerIsRunning.%loop-value%}%" to player
+                clear {parkour.playerIsRunning.%loop-value%}
+
+                # send "timestart: %{parkour.playerIsRunning.timeStart.%loop-value%}%" to player
+                clear {parkour.playerIsRunning.timeStart.%loop-value%}
+
+                # send "playerrunningmap: %{parkour.playerIsRunning.map.%loop-value%}%" to player
+                clear {parkour.playerIsRunning.map.%loop-value%}
+
+                # send "playerisfinishedandwaiting: %{parkour.playerIsFinishedAndWaiting.%loop-value%}%" to player
+                clear {parkour.playerIsFinishedAndWaiting.%loop-value%}
+
+                # send "totalcompletedcourses: %{parkour.playerTotalCompletedCourses.%loop-value%}%" to player
+                clear {parkour.playerTotalCompletedCourses.%loop-value%}
+
+            # send "list of names: %{parkour.ListOfNames::*}%" to player
+            clear {parkour.ListOfNames::*}
+            # send "quitlocation: %{parkour.QuitLocation}%" to player
+            clear {parkour.QuitLocation}
+            clear {parkour.ListOfAllPlayerUUIDs::*}
+            delete yaml value "settings" from "plugins/Skript/ParkourData/data.yml"
+            delete yaml value "courses" from "plugins/Skript/ParkourData/data.yml"
+            save yaml "plugins/Skript/ParkourData/data.yml"
+            send "{@prefix} All data has been cleared." to player
+
+        else if arg-1 is "help":
+            send "&c----->>> &ePARKOUR COMMAND HELP &c<<<-----"
+            send "&6/aparkour quitlocation &f: sets the global location players will be teleported to after quitting a course."
+            send "&6/aparkour create <name> &f: create's new course without positions set."
+            send "&6/aparkour delete <name> &f: deletes a course and its yml data."
+            send "&6/aparkour pos1 <name> &f: sets region corner 1 of course."
+            send "&6/aparkour pos2 <name> &f: sets region corner 2 of course."
+            send "&6/aparkour start <name> &f: sets start block of course with iron pressure plate."
+            send "&6/aparkour end <name> &f: sets end block of course with gold pressure plate."
+            send "&6/aparkour colorname <name> <newName> &f: use this to create a color coded name that appears in /parkour"
+            send "&6/aparkour reset &f: clears ALL parkour data. &cUse with caution!"
+            #send "&c----->>> &eCREATED BY LUUMIZ &c<<<-----"
+        
+        else if arg-1 is "quitlocation":
+            set {parkour.QuitLocation} to location of player
+            send "{@prefix} Players will be sent to this location when quitting a Parkour course." to player
+            set yaml value "settings.quitlocation" from "plugins/Skript/ParkourData/data.yml" to {parkour.QuitLocation}
+            save yaml "plugins/Skript/ParkourData/data.yml"
+
+        else if arg-1 is "create":
+            if {parkour.QuitLocation} is not set:
+                send "{@prefix} Please set a quitlocation before starting to create courses." to player
+                stop
+
+            if arg-2 is set:
+                set {_found} to false
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}: 
+                        set {_found} to true
+                        send "{@prefix} This course already exists. Choose a different name." to player
+                        exit 1 loop
+                if {_found} is false:
+                    add arg-2 to {parkour.ListOfNames::*}
+                    set {parkour.%arg-2%.isCreated} to true
+                    send "{@prefix} Created. Set pos1, pos2, start, and end for this course." to player
+                    set yaml value "courses.%arg-2%.created" from "plugins/Skript/ParkourData/data.yml" to true
+                    save yaml "plugins/Skript/ParkourData/data.yml"
+        
+        else if arg-1 is "pos1":
+            if arg-2 is set:
+                set {_found} to false
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                        if {parkour.%arg-2%.pos1} is not set:
+                            set {parkour.%arg-2%.pos1} to location of player
+                            set yaml value "courses.%arg-2%.pos1" from "plugins/Skript/ParkourData/data.yml" to location of player
+                            save yaml "plugins/Skript/ParkourData/data.yml"
+                            send "{@prefix} Position 1 set." to player
+                            set {_found} to true
+                            stop
+                        else:
+                            send "{@prefix} Position 1 of %arg-2% has already been set." to player
+                            stop
+                if {_found} is false:
+                    send "{@prefix} This parkour course does not exist." to player
+            else:
+                send "{@prefix} Select a course to set pos1 for." to player
+
+        else if arg-1 is "pos2":
+            if arg-2 is set:
+                set {_found} to false
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                        if {parkour.%arg-2%.pos2} is not set:
+                            set {parkour.%arg-2%.pos2} to location of player
+                            set yaml value "courses.%arg-2%.pos2" from "plugins/Skript/ParkourData/data.yml" to location of player
+                            save yaml "plugins/Skript/ParkourData/data.yml"
+                            send "{@prefix} Position 2 set." to player
+                            set {_found} to true
+                            stop
+                        else:
+                            send "{@prefix} Position 2 of %arg-2% has already been set."
+                            stop
+                if {_found} is false:
+                    send "{@prefix} This parkour course does not exist." to player
+            else:
+                send "{@prefix} Select a course to set pos2 for." to player
+
+        # if location of block below player is location of block below location {parkour.%{_region}%.end}:
+        else if arg-1 is "start":
+            if arg-2 is set:
+                set {_found} to false
+                set {_isInRegion} to false
+                
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                        if isPlayerInParkourRegionNotCompleted(player) is true:
+                            if {parkour.%arg-2%.start} is not set:
+                                set {parkour.%arg-2%.start} to location of player
+                                set block at location {parkour.%arg-2%.start} to iron pressure plate
+                                set yaml value "courses.%arg-2%.start" from "plugins/Skript/ParkourData/data.yml" to location of player
+                                save yaml "plugins/Skript/ParkourData/data.yml"
+                                send "{@prefix} Start block set." to player
+                                set {_found} to true
+                                exit 1 loop
+                            else:
+                                loop blocks in radius 2 of block at location {parkour.%arg-2%.start}:
+                                    # send "%loop-block%" to player
+                                    if block at location of loop-block is iron pressure plate:
+                                        # send "found" to player
+                                        set block at location of event-block to air
+                                set {parkour.%arg-2%.start} to location of player
+                                set block at location {parkour.%arg-2%.start} to iron pressure plate
+                                set yaml value "courses.%arg-2%.start" from "plugins/Skript/ParkourData/data.yml" to location of player
+                                save yaml "plugins/Skript/ParkourData/data.yml"
+                                send "{@prefix} Start block modified." to player
+                                set {_found} to true
+                                exit 1 loop
+                if {_found} is false:
+                    send "{@prefix} This parkour course does not exist or you're not in a parkour region." to player
+            else:
+                send "{@prefix} Select a course to set start for." to player
+        
+        else if arg-1 is "delete":
+            if arg-2 is set:
+                set {_found} to false
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                        clear {parkour.%arg-2%.pos1}
+                        clear {parkour.%arg-2%.pos2}
+                        clear {parkour.%arg-2%.start}
+                        clear {parkour.%arg-2%.end}
+                        remove arg-2 from {parkour.ListOfNames::*}
+                        delete yaml value "courses.%arg-2%" from "plugins/Skript/ParkourData/data.yml"
+                        save yaml "plugins/Skript/ParkourData/data.yml"
+                        send "{@prefix} Deleted course." to player
+                        set {_found} to true
+                        exit 1 loop
+                if {_found} is false:
+                    send "{@prefix} This parkour course does not exist." to player
+            else:
+                send "{@prefix} Select a course to delete." to player
+
+
+        else if arg-1 is "end":
+            if arg-2 is set:
+                set {_found} to false
+                loop {parkour.ListOfNames::*}:
+                    if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                        if isPlayerInParkourRegionNotCompleted(player) is true:
+                            if {parkour.%arg-2%.end} is not set:
+                                set {parkour.%arg-2%.end} to location of player
+                                set yaml value "courses.%arg-2%.end" from "plugins/Skript/ParkourData/data.yml" to location of player
+                                save yaml "plugins/Skript/ParkourData/data.yml"
+                                set block at location {parkour.%arg-2%.end} to golden pressure plate
+                                send "{@prefix} End block set." to player
+                                set {_found} to true
+                                exit 1 loop
+                            else:
+                                set block at location {parkour.%arg-2%.end} to air
+                                set {parkour.%arg-2%.end} to location of player
+                                set yaml value "courses.%arg-2%.end" from "plugins/Skript/ParkourData/data.yml" to location of player
+                                save yaml "plugins/Skript/ParkourData/data.yml"
+                                set block at location {parkour.%arg-2%.end} to golden pressure plate
+                                send "{@prefix} End block modified." to player
+                                set {_found} to true
+                                exit 1 loop
+                if {_found} is false:
+                    send "{@prefix} This parkour course does not exist or you're not in a parkour region." to player
+            else:
+                send "{@prefix} Select a course to set end for." to player
+
+        else if arg-1 is "colorname":
+            if arg-2 is set:
+                if arg-3 is set:
+                    set {_found} to false
+                    loop {parkour.ListOfNames::*}:
+                        if arg-2 is {parkour.ListOfNames::%loop-index%}:
+                            set {_found} to true
+                            if uncolored arg-2 is uncolored arg-3:
+                                set {parkour.%arg-2%.name} to arg-3
+                                set yaml value "courses.%arg-2%.colorname" from "plugins/Skript/ParkourData/data.yml" to arg-3
+                                save yaml "plugins/Skript/ParkourData/data.yml"
+                                send "{@prefix} Course named changed." to player
+                            else:
+                                send "{@prefix} Mismatch of names." to player
+                    if {_found} is false:
+                        send "{@prefix} This parkour course does not exist or you're not in a parkour region." to player
+                else:
+                    send "{@prefix} You need to add the new course name." to player
+            else:
+                send "{@prefix} Select a course to set end for." to player
+
+
+command {@player_command}:
+    permission: parkour.play
+    trigger:
+        set {_size} to size of {parkour.ListOfNames::*}
+        if {_size} is equal to 0:
+            send "{@prefix} There are no parkour courses available right now." to player
+            stop
+
+        set metadata tag "parkour_list_view" of player to chest inventory with 3 rows named colored "Choose A Parkour Course!"
+        set {parkour.inTpMenu.%player's uuid%} to true
+        set {_chestslot} to 0
+        set {_item} to 1
+        loop {_size} times:
+            set {_passesCheck} to false
+            if {parkour.%{parkour.ListOfNames::%{_item}%}%.pos1} is set:
+                if {parkour.%{parkour.ListOfNames::%{_item}%}%.pos2} is set:
+                    if {parkour.%{parkour.ListOfNames::%{_item}%}%.start} is set:
+                        if {parkour.%{parkour.ListOfNames::%{_item}%}%.end} is set:
+
+                            if {parkour.%{parkour.ListOfNames::%{_item}%}%.name} is set:
+                                if {parkour.playerHasFinished.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%} is true:
+                                    set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%"
+                                else:
+                                    set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&cINCOMPLETE"
+                                set {_passesCheck} to true
+                            else:
+                                if {parkour.playerHasFinished.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%} is true:
+                                    set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named "%{parkour.ListOfNames::%{_item}%}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%"
+                                else:
+                                    set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named  "%{parkour.ListOfNames::%{_item}%}%" with lore "&cINCOMPLETE"
+                                set {_passesCheck} to true
+
+            if {_passesCheck} is true:        
+                add 1 to {_chestslot}
+            add 1 to {_item}
+        if {parkour.playerIsRunning.%player's uuid%} is true:
+            set slot 26 of metadata tag "parkour_list_view" of player to barrier named "&cQuit"
+        open (metadata tag "parkour_list_view" of player) to player
+
+on inventory click:
+    set {_inv} to the clicked inventory
+    if {parkour.inTpMenu.%player's uuid%} is true:
+        if "%{_inv}%" is "inventory of %player%":
+            cancel event
+    if event-inventory = (metadata tag "parkour_list_view" of player):
+        cancel event
+        if index of event-slot is 26:
+            if {parkour.playerIsRunning.%player's uuid%} is true:
+                clear {parkour.playerIsRunning.%player's uuid%}
+                clear {parkour.playerIsRunning.timeStart.%player's uuid%}
+                clear {parkour.playerIsRunning.map.%player's uuid%}
+                send "{@prefix} {@player_leaves_course}" to player
+                wait 1 second
+                teleport player to location of {parkour.quitlocation}
+        else:
+            if "%name of event-slot%" is not "<none>":
+                set {_tp} to uncolored name of event-slot
+                clear {parkour.playerIsRunning.%player's uuid%}
+                clear {parkour.playerIsRunning.timeStart.%player's uuid%}
+                clear {parkour.playerIsRunning.map.%player's uuid%}
+                send "{@prefix} {@player_teleports_to_course}" to player
+                wait 1 second
+                teleport player to location of {parkour.%{_tp}%.start}
+
+
+on inventory close:
+    if {parkour.inTpMenu.%player's uuid%} is true:
+        set {parkour.inTpMenu.%player's uuid%} to false
+
+on stepping on pressure plate:
+    if event-block is iron pressure plate:
+        if {parkour.playerIsFinishedAndWaiting.%player's uuid%} is not set:
+            set {parkour.playerIsFinishedAndWaiting.%player's uuid%} to false
+        if {parkour.playerIsFinishedAndWaiting.%player's uuid%} is true:
+            stop
+
+        if {parkour.playerIsRunning.map.%player's uuid%} is set:
+            stop
+            
+        if isPlayerInParkourRegion(player) is true:
+            if {parkour.playerIsRunning.%player's uuid%} is not true:
+                send "{@prefix} {@player_starts_course}" to player
+
+                if {parkour.ListOfAllPlayerUUIDs::*} does not contain player's uuid:
+                    add player's uuid to {parkour.ListOfAllPlayerUUIDs::*}
+
+                set {parkour.playerIsRunning.%player's uuid%} to true
+                set {parkour.playerIsRunning.timeStart.%player's uuid%} to now
+                set {parkour.playerIsRunning.map.%player's uuid%} to whatParkourRegionIsPlayerIn(player)
+                # send player title "&eStart" with subtitle "" for 2 seconds
+                execute console command "/playsound minecraft:block.note_block.chime master %player% ~ ~ ~ 10"
+                # execute console command "/tag %player% add parkour"
+                
+    else if event-block is golden pressure plate:
+        if {parkour.playerIsRunning.%player's uuid%} is true:
+            set {_region} to whatParkourRegionIsPlayerIn(player)
+            if {_region} is {parkour.playerIsRunning.map.%player's uuid%}:
+                if location of block below player is location of block below location {parkour.%{_region}%.end}:
+
+                    send "{@prefix} {@player_finishes_course}" to player
+                    set {_time} to difference between {parkour.playerIsRunning.timeStart.%player's uuid%} and now
+                    send "{@prefix} Time: %{_time}%" to player
+                    launch ball large coloured red, purple and white fading to light green and black at player's location with duration 1
+ 
+                    if {parkour.playerHasFinished.BestTime.%{_region}%.%player's uuid%} is not set:
+                        add 1 to {parkour.playerTotalCompletedCourses.%player's uuid%}
+                        set {parkour.playerHasFinished.BestTime.%{_region}%.%player's uuid%} to {_time}
+                        set yaml value "courses.%{_region}%.completions.%player's uuid%" from "plugins/Skript/ParkourData/data.yml" to {_time}
+                        save yaml "plugins/Skript/ParkourData/data.yml"
+                    else if {_time} < {parkour.playerHasFinished.BestTime.%{_region}%.%player's uuid%}:
+                        set {parkour.playerHasFinished.BestTime.%{_region}%.%player's uuid%} to {_time}
+                        set yaml value "courses.%{_region}%.completions.%player's uuid%" from "plugins/Skript/ParkourData/data.yml" to {_time}
+                        save yaml "plugins/Skript/ParkourData/data.yml"
+
+                    set {parkour.playerIsRunning.%player's uuid%} to false
+                    set {parkour.playerIsFinishedAndWaiting.%player's uuid%} to true
+                    wait 1 second
+                    send "{@prefix} Leaving Parkour Course..." to player
+                    wait 4 seconds
+                    set {parkour.playerIsRunning.%player's uuid%} to false
+                    if {parkour.playerHasFinished.%{_region}%.%player's uuid%} is not true:
+                        set {parkour.playerHasFinished.%{_region}%.%player's uuid%} to true
+                    clear {parkour.playerIsRunning.timeStart.%player's uuid%}
+                    clear {parkour.playerIsRunning.map.%player's uuid%}
+                    set {parkour.playerIsFinishedAndWaiting.%player's uuid%} to false
+                    teleport player to location of {parkour.quitlocation} 
+
+
+# function %function name%(%variable name%: %variable type%) :: %return type%:
+function isPlayerInParkourRegion(p: player) :: boolean:
+    loop {parkour.ListOfNames::*}:
+        set {_parkourX1} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        set {_parkourY1} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        set {_parkourZ1} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+
+        set {_parkourX2} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        set {_parkourY2} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        set {_parkourZ2} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+
+        set {_playerX} to x coordinate of {_p}
+        set {_playerY} to y coordinate of {_p}
+        set {_playerZ} to z coordinate of {_p}
+
+        if {_playerX} is between {_parkourX1} and {_parkourX2}:
+            # send "x" to {_p}
+            if {_playerY} is between {_parkourY1} and {_parkourY2}:
+                # send "y" to {_p}
+                if {_playerZ} is between {_parkourZ1} and {_parkourZ2}:
+                    # send "z" to {_p}
+                    if isRegionCompleted({parkour.ListOfNames::%loop-index%}) is true:
+                        # send "true" to {_p}
+                        return true
+    return false
+
+function isPlayerInParkourRegionNotCompleted(p: player) :: boolean:
+    loop {parkour.ListOfNames::*}:
+        set {_parkourX1} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        set {_parkourY1} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        set {_parkourZ1} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+
+        set {_parkourX2} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        set {_parkourY2} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        set {_parkourZ2} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+
+        set {_playerX} to x coordinate of {_p}
+        set {_playerY} to y coordinate of {_p}
+        set {_playerZ} to z coordinate of {_p}
+
+        if {_playerX} is between {_parkourX1} and {_parkourX2}:
+            # send "x" to {_p}
+            if {_playerY} is between {_parkourY1} and {_parkourY2}:
+                # send "y" to {_p}
+                if {_playerZ} is between {_parkourZ1} and {_parkourZ2}:
+                    # send "z" to {_p}
+                    return true
+    return false
+
+function whatParkourRegionIsPlayerIn(p: player) :: text:
+    loop {parkour.ListOfNames::*}:
+        #set {_parkourX1} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        #set {_parkourY1} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+        #set {_parkourZ1} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos1}
+
+        #set {_parkourX2} to x coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        #set {_parkourY2} to y coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+        #set {_parkourZ2} to z coordinate of {parkour.%{parkour.ListOfNames::%loop-index%}%.pos2}
+
+        #set {_playerX} to x coordinate of {_p}
+        #set {_playerY} to y coordinate of {_p}
+        #set {_playerZ} to z coordinate of {_p}
+
+        #if {_playerX} is between {_parkourX1} and {_parkourX2}:
+        #    if {_playerY} is between {_parkourY1} and {_parkourY2}:
+        #        if {_playerZ} is between {_parkourZ1} and {_parkourZ2}:
+        #            return {parkour.ListOfNames::%loop-index%}
+
+        set {_playerCoords} to {_p}'s location
+        set {_parkour1a} to yaml value "%{parkour.ListOfNames::%loop-index%}%.pos1" from "plugins/Skript/ParkourData/data.yml"
+        set {_parkour2a} to yaml value "%{parkour.ListOfNames::%loop-index%}%.pos2" from "plugins/Skript/ParkourData/data.yml"
+        if {_playerCoords} is between {_parkour1a} and {_parkour2a}:
+            return {parkour.ListOfNames::%loop-index%}
+            
+    return "player not in a region"
+
+function isRegionCompleted(region: text) :: boolean:
+    if {parkour.%{_region}%.pos1} is set:
+        if {parkour.%{_region}%.pos2} is set:
+            if {parkour.%{_region}%.start} is set:
+                if {parkour.%{_region}%.end} is set:
+                    return true
+    return false
+
+on walking on barrier:
+    # send "barrier" to player
+    if isPlayerInParkourRegion(player) is true:
+        if {parkour.playerIsFinishedAndWaiting.%player's uuid%} is not set:
+            set {parkour.playerIsFinishedAndWaiting.%player's uuid%} to false
+        if {parkour.playerIsFinishedAndWaiting.%player's uuid%} is true:
+            stop
+        else:
+            if {parkour.playerIsRunning.%player's uuid%} is true:
+                # send "in region" to player
+                set {_region} to whatParkourRegionIsPlayerIn(player)
+                # send "%{parkour.%{_region}%.start}%" to player
+                execute console command "/execute at %player% run playsound minecraft:block.note_block.didgeridoo master %player% ~ ~ ~ 10"
+                teleport player to location of {parkour.%{_region}%.start}
+
+on command:
+    if {parkour.playerIsRunning.%player's uuid%} is true:
+        if command is not "parkour":
+            cancel event
+            send "{@prefix} {@player_command_warning_while_doing_course}" to player
+
+on join:
+    if {parkour.playerIsRunning.%player's uuid%} is true:
+        clear {parkour.playerIsRunning.%player's uuid%}
+        clear {parkour.playerIsRunning.timeStart.%player's uuid%}
+        clear {parkour.playerIsRunning.map.%player's uuid%}
+        teleport player to location of {parkour.quitlocation}
+        send "{@prefix} You logged out while completing a parkour course and your progress has been cleared." to player
+
