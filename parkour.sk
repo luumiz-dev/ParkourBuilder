@@ -1,12 +1,13 @@
 #
 # LuuMiz's Parkour Skript
 #
-# Plugins Required: Skript, SkBee, skript-yaml
+# Plugins Required: Skript v2.8.0, SkBee v3.2.1, skript-yaml v1.5
 #
 # COMMAND USAGE
 #   /aparkour create courseName : creates a Parkour Course to set a bounding box for.
 #   /aparkour pos1 courseName : sets corner 1
-#   /aparkour pos2 courseName : set corner 2
+#   /aparkour pos2 courseName : sets corner 2
+#   /aparkour spawn courseName : sets the location where player will be teleported to when clicking a course in /parkour
 #   /aparkour start courseName : sets block where timer starts for player, tp'ed players will be facing the direction you are when its set
 #   /aparkour end courseName : sets end block
 #   /aparkour colorname courseName newCourseName : use this to create a color coded name that appears in /parkour
@@ -84,6 +85,12 @@ options:
 
 on load:
     load yml "plugins/Skript/ParkourData/data.yml" as "plugins/Skript/ParkourData/data.yml"
+on tab complete of "/testtt":
+    set tab completions for position 1 to "ttt"
+command /testtt:
+    permission: tt
+    trigger:
+        send "hi"
 
 on tab complete of "{@admin_command}":
     set tab completions for position 1 to "create", "pos1", "pos2", "start", "help", "end", "delete", "spawn", "colorname", and "quitlocation"
@@ -91,7 +98,7 @@ on tab complete of "{@admin_command}":
         set tab completions for position 2 to {parkour.ListOfNames::*}
 
 command {@admin_command} <text> [<text>] [<text>]:
-    permission:parkour.admin
+    permission: minecraft.op
     trigger:
         if arg-1 is "reset":
             loop {parkour.ListOfNames::*}:
@@ -180,7 +187,7 @@ command {@admin_command} <text> [<text>] [<text>]:
                 if {_found} is false:
                     add arg-2 to {parkour.ListOfNames::*}
                     set {parkour.%arg-2%.isCreated} to true
-                    send "{@prefix} Created. Set pos1, pos2, start, and end for this course." to player
+                    send "{@prefix} Created. Set pos1, pos2, start, end, and spawn for this course." to player
                     set yaml value "courses.%arg-2%.created" from "plugins/Skript/ParkourData/data.yml" to true
                     save yaml "plugins/Skript/ParkourData/data.yml"
         
@@ -236,20 +243,16 @@ command {@admin_command} <text> [<text>] [<text>]:
                         if isPlayerInParkourRegionNotCompleted(player) is true:
                             if {parkour.%arg-2%.start} is not set:
                                 set {parkour.%arg-2%.start} to location of player
-                                set block at location {parkour.%arg-2%.start} to iron pressure plate
+                                set block at {parkour.%arg-2%.start} to iron pressure plate
                                 set yaml value "courses.%arg-2%.start" from "plugins/Skript/ParkourData/data.yml" to location of player
                                 save yaml "plugins/Skript/ParkourData/data.yml"
                                 send "{@prefix} Start block set." to player
                                 set {_found} to true
                                 exit 1 loop
                             else:
-                                loop blocks in radius 2 of block at location {parkour.%arg-2%.start}:
-                                    # send "%loop-block%" to player
-                                    if block at location of loop-block is iron pressure plate:
-                                        # send "found" to player
-                                        set block at location of event-block to air
+                                set block at {parkour.%arg-2%.start} to air
                                 set {parkour.%arg-2%.start} to location of player
-                                set block at location {parkour.%arg-2%.start} to iron pressure plate
+                                set block at {parkour.%arg-2%.start} to iron pressure plate
                                 set yaml value "courses.%arg-2%.start" from "plugins/Skript/ParkourData/data.yml" to location of player
                                 save yaml "plugins/Skript/ParkourData/data.yml"
                                 send "{@prefix} Start block modified." to player
@@ -290,16 +293,16 @@ command {@admin_command} <text> [<text>] [<text>]:
                                 set {parkour.%arg-2%.end} to location of player
                                 set yaml value "courses.%arg-2%.end" from "plugins/Skript/ParkourData/data.yml" to location of player
                                 save yaml "plugins/Skript/ParkourData/data.yml"
-                                set block at location {parkour.%arg-2%.end} to golden pressure plate
+                                set block at {parkour.%arg-2%.end} to golden pressure plate
                                 send "{@prefix} End block set." to player
                                 set {_found} to true
                                 exit 1 loop
                             else:
-                                set block at location {parkour.%arg-2%.end} to air
+                                set block at {parkour.%arg-2%.end} to air
                                 set {parkour.%arg-2%.end} to location of player
                                 set yaml value "courses.%arg-2%.end" from "plugins/Skript/ParkourData/data.yml" to location of player
                                 save yaml "plugins/Skript/ParkourData/data.yml"
-                                set block at location {parkour.%arg-2%.end} to golden pressure plate
+                                set block at {parkour.%arg-2%.end} to golden pressure plate
                                 send "{@prefix} End block modified." to player
                                 set {_found} to true
                                 exit 1 loop
@@ -372,15 +375,15 @@ command {@player_command}:
 
                                 if {parkour.%{parkour.ListOfNames::%{_item}%}%.name} is set:
                                     if {parkour.playerHasFinished.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%} is true:
-                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%"
+                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%" and "&7Right-Click for Leaderboards"
                                     else:
-                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&cINCOMPLETE"
+                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named colored "%{parkour.%{parkour.ListOfNames::%{_item}%}%.name}%" with lore "&cINCOMPLETE" and "&7Right-Click for Leaderboards"
                                     set {_passesCheck} to true
                                 else:
                                     if {parkour.playerHasFinished.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%} is true:
-                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named "%{parkour.ListOfNames::%{_item}%}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%"
+                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to green stained glass named "%{parkour.ListOfNames::%{_item}%}%" with lore "&aCOMPLETE" and "&aBest Time: %{parkour.playerHasFinished.BestTime.%{parkour.ListOfNames::%{_item}%}%.%player's uuid%}%" and "&7Right-Click for Leaderboards"
                                     else:
-                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named  "%{parkour.ListOfNames::%{_item}%}%" with lore "&cINCOMPLETE"
+                                        set slot {_chestslot} of metadata tag "parkour_list_view" of player to red stained glass named  "%{parkour.ListOfNames::%{_item}%}%" with lore "&cINCOMPLETE" and "&7Right-Click for Leaderboards"
                                     set {_passesCheck} to true
 
             if {_passesCheck} is true:        
@@ -407,13 +410,16 @@ on inventory click:
                 teleport player to location of {parkour.quitlocation}
         else:
             if "%name of event-slot%" is not "<none>":
-                set {_tp} to uncolored name of event-slot
-                clear {parkour.playerIsRunning.%player's uuid%}
-                clear {parkour.playerIsRunning.timeStart.%player's uuid%}
-                clear {parkour.playerIsRunning.map.%player's uuid%}
-                send "{@prefix} {@player_teleports_to_course}" to player
-                wait 1 second
-                teleport player to location of {parkour.%{_tp}%.spawn}
+                if "%click type%" = "right mouse button" or "right mouse button with shift":
+                    send "leaderboards :D" to player
+                else:
+                    set {_tp} to uncolored name of event-slot
+                    clear {parkour.playerIsRunning.%player's uuid%}
+                    clear {parkour.playerIsRunning.timeStart.%player's uuid%}
+                    clear {parkour.playerIsRunning.map.%player's uuid%}
+                    send "{@prefix} {@player_teleports_to_course}" to player
+                    wait 1 second
+                    teleport player to location of {parkour.%{_tp}%.spawn}
 
 
 on inventory close:
